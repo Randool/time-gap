@@ -1,0 +1,21 @@
+README.md
+  s_671c4b87fee35f::t_02581171f3cea9 77-85,93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f423d58b4416b74d70f28725952e47a73bbcbd75",
+  "prompts": {},
+  "sessions": {
+    "s_671c4b87fee35f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5a44-74c9-7f00-8506-c25822138fee",
+        "model": "unknown"
+      },
+      "human_author": "dailingfeng <dailingfeng@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
