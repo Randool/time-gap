@@ -74,7 +74,15 @@ flowchart LR
 
 ## Install
 
-Clone or copy this directory to your Hermes plugins folder:
+Clone the plugin directly into Hermes and enable it:
+
+```bash
+cd ~/.hermes/plugins
+git clone https://github.com/Randool/time-gap.git
+hermes plugins enable time-gap
+```
+
+This creates the following plugin directory:
 
 ```text
 ~/.hermes/plugins/time-gap/
@@ -82,7 +90,7 @@ Clone or copy this directory to your Hermes plugins folder:
 └── plugin.yaml
 ```
 
-Then enable it in `~/.hermes/config.yaml` and reload Hermes:
+To customize its behavior, edit the generated entry in `~/.hermes/config.yaml` and reload Hermes:
 
 ```yaml
 plugins:
