@@ -1,0 +1,8 @@
+name: time-gap
+version: "1.0.0"
+description: Inject an implicit time-gap sense only when a gap or a date rollover crosses.
+author: "Randool"
+hooks:
+  - pre_llm_call
+provides_hooks:
+  - pre_llm_call
