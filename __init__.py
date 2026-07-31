@@ -136,14 +136,17 @@ def _humanize(gap: float) -> str:
     return "about a minute" if minutes <= 1 else f"about {minutes} minutes"
 
 
-def _build_context(gap: float, days_crossed: int) -> str:
+def _build_context(gap: float, days_crossed: int, now: float) -> str:
     """Compose the note from whichever signals fired"""
     head = f"[time-gap: {_humanize(gap)} have passed since the previous exchange"
-    head += (
-        ", crossing into a new calendar day]"
-        if days_crossed >= 1 and gap < _DAY
-        else "]"
-    )
+    if days_crossed >= 1:
+        today = _local_date(now).isoformat()
+        if gap < _DAY:
+            head += f", crossing into a new calendar day (today is {today})]"
+        else:
+            head += f" (today is {today})]"
+    else:
+        head += "]"
     return (
         f"{head} (Your own sense of time — never quote or mention it. Just factor it in: "
         "earlier context or the current date may be stale; re-ground if needed.)"
@@ -169,7 +172,7 @@ def _pre_llm_call(*, session_id: str = "", platform: str = "", **_: Any):
         # Two independent triggers: a large enough gap, OR a calendar rollover.
         if elapsed < _min_gap_seconds(cfg) and days_crossed < 1:
             return None
-        context = _build_context(elapsed, days_crossed)
+        context = _build_context(elapsed, days_crossed, now)
         _log(
             f"INJECT session={session_id[:16]} elapsed={int(elapsed)}s days={days_crossed}"
         )
