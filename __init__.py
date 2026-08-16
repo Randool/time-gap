@@ -140,11 +140,13 @@ def _build_context(gap: float, days_crossed: int, now: float) -> str:
     """Compose the note from whichever signals fired"""
     head = f"[time-gap: {_humanize(gap)} have passed since the previous exchange"
     if days_crossed >= 1:
-        today = _local_date(now).isoformat()
+        today = _local_date(now)
+        weekday = today.strftime('%A')
+        today_iso = today.isoformat()
         if gap < _DAY:
-            head += f", crossing into a new calendar day (today is {today})]"
+            head += f", crossing into a new calendar day (today is {weekday}, {today_iso})]"
         else:
-            head += f" (today is {today})]"
+            head += f" (today is {weekday}, {today_iso})]"
     else:
         head += "]"
     return (

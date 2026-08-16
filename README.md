@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 2.0.0" src="https://img.shields.io/badge/version-v2.0.0-7c3aed?style=flat-square" />
+  ![Version 2.1.0](https://img.shields.io/badge/version-v2.1.0-7c3aed?style=flat-square)
   <img alt="Hook: pre_llm_call" src="https://img.shields.io/badge/hook-pre__llm__call-0891b2?style=flat-square" />
   <img alt="Database access: read only" src="https://img.shields.io/badge/state.db-read--only-10b981?style=flat-square" />
   <img alt="Silence by default" src="https://img.shields.io/badge/default-silent-64748b?style=flat-square" />
