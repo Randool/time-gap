@@ -164,16 +164,16 @@ Exact wall-clock time is never injected. If precision matters, the model can re-
 
 ## Test
 
-The suite covers session isolation, WAL visibility, platform exclusions, graded phrasing, midnight rollover, disabled settings, and fail-open behavior.
+The suite covers session isolation, WAL visibility, notification turns, platform exclusions, graded phrasing, midnight rollover, disabled settings, and fail-open behavior.
 
 ```bash
-python -m pytest tests/test_time_gap.py -q
+python -m pytest tests -q
 ```
 
 From a Hermes source checkout, use:
 
 ```bash
-python -m pytest plugins/time-gap/tests/test_time_gap.py -q
+python -m pytest plugins/time-gap/tests -q
 ```
 
 ---
