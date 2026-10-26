@@ -59,14 +59,14 @@ Stamping every turn adds noise and makes chat feel mechanical. `time-gap` treats
 flowchart LR
     A["pre_llm_call"] --> B{"Enabled for this platform?"}
     B -- No --> S["Stay silent"]
-    B -- Yes --> C["Read last assistant timestamp<br/>from state.db"]
+    B -- Yes --> C["Read last non-notification exchange<br/>from state.db"]
     C --> D{"Gap threshold or<br/>local date rollover?"}
     D -- No --> S
     D -- Yes --> E["Append private context<br/>to current user turn"]
     E --> F["Call the model"]
 ```
 
-- **Restart-safe:** elapsed time comes from the last persisted assistant message, not in-process memory.
+- **Restart-safe:** elapsed time comes from the last persisted assistant message outside notification turns, not in-process memory.
 - **Prompt-cache friendly:** the note rides on the current user turn and never touches the cached system-prompt prefix.
 - **Transcript-clean:** injected context is used for the API call only and is never written back to session history.
 - **Timezone-aware:** midnight follows Hermes' configured timezone through `hermes_time.get_timezone`, not UTC.
@@ -116,7 +116,31 @@ The defaults are intentionally conservative: a **120-minute threshold**, date-ch
 | `min_gap_seconds` | `7200` | Minimum elapsed time before a note is injected |
 | `notify_date_change` | `true` | Also trigger when the user's local calendar date changes |
 | `exclude_platforms` | `[cron]` | Platforms that should never receive a time-gap note |
+| `exclude_user_prefixes` | `[]` | Exact prefixes identifying background user turns in a shared session |
 | `debug` | `false` | Write decisions to the plugin-local `debug.log` |
+
+### Notifications in the same conversation
+
+Background reminders can share a session with human messages. Their assistant
+replies must not reset the human conversation's clock. When available, the plugin
+recognizes `display_kind: notification` and nonempty
+`display_metadata.notification_category` on persisted messages. A marked user
+message excludes its entire turn, including unmarked tool-call assistant messages.
+`hidden` alone is not treated as proof of automation.
+
+For integrations that identify events with a text marker, configure exact prefixes:
+
+```yaml
+exclude_user_prefixes:
+  - "[background-event "
+```
+
+Use the marker actually emitted by your integration. It is checked only at the
+start of user text, including text blocks in multimodal messages. Matching current
+turns receive no time-gap hint; matching historical turns do not reset the clock.
+Unmarked automated messages cannot be distinguished from human messages, so the
+producer must supply metadata or a configured prefix. Old databases without the
+optional display columns continue to work with prefix matching.
 
 ### Human-friendly, intentionally imprecise
 
@@ -133,7 +157,7 @@ Exact wall-clock time is never injected. If precision matters, the model can re-
 
 ## Design guarantees
 
-1. The **last assistant reply** defines the previous completed exchange. A newly persisted user turn cannot accidentally reset the clock.
+1. The **last assistant reply outside notification turns** defines the previous completed exchange. A newly persisted user turn cannot accidentally reset the clock. A long-running human request still counts as active conversation until its reply.
 2. Gap and date rollover are **independent triggers**. A 10-minute pause across midnight can matter even when the normal threshold is two hours.
 3. Multi-day messages avoid redundant wording: `about 3 days` already implies a date change.
 4. Every failure path returns no context rather than blocking a user turn.
