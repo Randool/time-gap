@@ -7,13 +7,14 @@ continuous conversation is never interrupted.
 Via the ``pre_llm_call`` hook the note rides on the user message at API-call
 time only (never persisted, never touches the cached system prompt). The gap is
 read from ``state.db`` (read-only) using the last persisted *assistant* message
-— the moment the prior turn completed, which naturally excludes the current user
-row. No in-process state; fails open on any error.
+in a non-notification turn — the moment the prior exchange completed, which
+naturally excludes the current user row. No in-process state; fails open on errors.
 
 Set ``plugins.entries.time-gap.debug: true`` in config.yaml to append decisions
 to ``debug.log`` next to this file.
 """
 
+import json
 import sqlite3
 import time
 import traceback
@@ -79,8 +80,48 @@ def _db_path():
     return get_hermes_home() / "state.db"
 
 
+def _notification(content: Any, display_kind: Any = None,
+                  display_metadata: Any = None) -> bool:
+    """Recognize explicit notification markers, without guessing from prose."""
+    if display_kind == "notification":
+        return True
+    if isinstance(display_metadata, str):
+        try:
+            display_metadata = json.loads(display_metadata)
+        except (ValueError, TypeError):
+            display_metadata = None
+    if isinstance(display_metadata, dict) and display_metadata.get("notification_category"):
+        return True
+    prefixes = _plugin_config().get("exclude_user_prefixes", [])
+    if not isinstance(prefixes, (list, tuple)) or not prefixes:
+        return False
+    if isinstance(content, str):
+        # Persisted multimodal messages may be JSON-encoded content blocks.
+        try:
+            decoded = json.loads(content)
+        except (ValueError, TypeError):
+            decoded = None
+        if isinstance(decoded, list):
+            content = decoded
+    if isinstance(content, list):
+        content = "\n".join(
+            part["text"] for part in content
+            if isinstance(part, dict) and part.get("type") in ("text", "input_text")
+            and isinstance(part.get("text"), str)
+        )
+    return isinstance(content, str) and any(
+        isinstance(prefix, str) and bool(prefix) and content.startswith(prefix)
+        for prefix in prefixes
+    )
+
+
 def _last_exchange_ts(session_id: str) -> Optional[float]:
-    """Timestamp of the last assistant message, or None. Read-only, no write lock."""
+    """Last assistant timestamp outside notification turns, or None.
+
+    Walk backwards in persisted message order. A user row owns all assistant
+    rows up to the next user row, including tool-call messages. Do not filter
+    hidden/inactive rows out of this stream: they still delimit turns.
+    """
     path = _db_path()
     if not session_id or not path.exists():
         return None
@@ -89,12 +130,28 @@ def _last_exchange_ts(session_id: str) -> Optional[float]:
         conn = sqlite3.connect(
             f"file:{path}?mode=ro", uri=True, check_same_thread=False, timeout=1.0
         )
-        (ts,) = conn.execute(
-            "SELECT MAX(timestamp) FROM messages "
-            "WHERE session_id = ? AND role = 'assistant'",
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(messages)")}
+        kind = "display_kind" if "display_kind" in columns else "NULL"
+        metadata = "display_metadata" if "display_metadata" in columns else "NULL"
+        rows = conn.execute(
+            f"SELECT role, content, timestamp, {kind}, {metadata} FROM messages "
+            "WHERE session_id = ? AND role IN ('user', 'assistant') "
+            "ORDER BY rowid DESC",
             (session_id,),
-        ).fetchone()
-        return float(ts) if isinstance(ts, (int, float)) and ts > 0 else None
+        )
+        candidate = None
+        for role, content, ts, display_kind, display_metadata in rows:
+            marked = _notification(content if role == "user" else None,
+                                   display_kind, display_metadata)
+            if role == "assistant":
+                if not marked and isinstance(ts, (int, float)) and ts > 0:
+                    candidate = max(candidate or ts, ts)
+            elif marked:
+                candidate = None
+            elif candidate is not None:
+                return candidate
+        # Old/imported histories can contain assistant rows without a user row.
+        return candidate
     except Exception:
         _log(f"DB read failed:\n{traceback.format_exc()}")
         return None
@@ -155,11 +212,14 @@ def _build_context(gap: float, days_crossed: int, now: float) -> str:
     )
 
 
-def _pre_llm_call(*, session_id: str = "", platform: str = "", **_: Any):
+def _pre_llm_call(*, session_id: str = "", platform: str = "",
+                  user_message: Any = None, **_: Any):
     """Return time-gap context when a gap or a date rollover crosses, else None."""
     try:
         cfg = _plugin_config()
         if cfg.get("enabled", True) is False or _excluded(platform, cfg):
+            return None
+        if _notification(user_message):
             return None
         prev = _last_exchange_ts(session_id)
         if prev is None:

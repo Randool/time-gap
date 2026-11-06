@@ -30,12 +30,12 @@ def _make_state_db(path: Path) -> None:
     conn.close()
 
 
-def _add_msg(path: Path, session_id: str, role: str, ts: float) -> None:
+def _add_msg(path: Path, session_id: str, role: str, ts: float, content="x") -> None:
     conn = sqlite3.connect(str(path))
     conn.execute(
         "INSERT INTO messages (session_id, role, content, timestamp) "
         "VALUES (?, ?, ?, ?)",
-        (session_id, role, "x", ts),
+        (session_id, role, content, ts),
     )
     conn.commit()
     conn.close()
