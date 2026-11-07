@@ -83,7 +83,7 @@ def _db_path():
 def _notification(content: Any, display_kind: Any = None,
                   display_metadata: Any = None) -> bool:
     """Recognize explicit notification markers, without guessing from prose."""
-    if display_kind == "notification":
+    if display_kind in ("notification", "internal_notification"):
         return True
     if isinstance(display_metadata, str):
         try:
